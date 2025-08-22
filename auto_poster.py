@@ -4,9 +4,9 @@ import requests
 from pytrends.request import TrendReq
 
 # Настройки (получаем из секретов GitHub Actions)
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+TELEGRAM_TOKEN = os.getenv("8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI")
+TELEGRAM_CHANNEL_ID = os.getenv("-1002201089739")
+GOOGLE_API_KEY = os.getenv("AIzaSyA4MDuek8WeQen2s09C5F_kDkkq8rgN2Bk")
 
 NISHA = ["маркетинг", "реклама", "новости", "социальные сети"]
 
