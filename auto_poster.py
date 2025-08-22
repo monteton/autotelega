@@ -1,82 +1,81 @@
 import os
 import random
 import requests
-from datetime import datetime, timedelta
-from apscheduler.schedulers.blocking import BlockingScheduler
 from pytrends.request import TrendReq
 
-# Настройки
-TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
-TELEGRAM_CHANNEL_ID = "-1002201089739"
-GOOGLE_API_KEY = "AIzaSyA4MDuek8WeQen2s09C5F_kDkkq8rgN2Bk"
-TZ = "Europe/Belgrade"
+# Настройки (получаем из секретов GitHub Actions)
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-POST_TIMES = ["08:00", "10:00", "14:00", "17:00", "19:00"]
 NISHA = ["маркетинг", "реклама", "новости", "социальные сети"]
 
 def get_trends():
-    pytrends = TrendReq(hl='ru-RU', tz=2)
-    pytrends.build_payload(NISHA, timeframe='now 1-d', geo='RS')
+    pytrends = TrendReq(hl='ru-RU', tz=360) # tz 360 - это Москва (UTC+3), близко к Белграду
+    pytrends.build_payload(NISHA, timeframe='now 1-d', geo='RS') # RS - Сербия
     trends = pytrends.related_queries()
     all_trends = []
     for key in NISHA:
-        if trends[key]['top'] is not None:
-            all_trends += [row['query'] for row in trends[key]['top'].to_dict('records')]
-    return list(set(all_trends))
+        if trends[key] is not None and trends[key]['top'] is not None:
+            all_trends.extend([row['query'] for index, row in trends[key]['top'].iterrows()])
+    return list(set(all_trends)) if all_trends else ["тренды в маркетинге 2025"] # Запасной вариант
 
 def generate_text(trend):
     prompt = f"Напиши короткий (от 100 до 4096 символов) пост в легком, можно с юмором стиле по теме '{trend}' для Telegram-канала о маркетинге, рекламе, новостях или соцсетях."
+    # ... (код для генерации текста остается прежним)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GOOGLE_API_KEY}"
     headers = {"Content-Type": "application/json"}
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
+    data = {"contents": [{"parts": [{"text": prompt}]}]}
     response = requests.post(url, json=data, headers=headers)
-    text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-    return text[:4096]
+    if response.status_code == 200 and "candidates" in response.json():
+        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    else:
+        return f"Не удалось сгенерировать текст для тренда: {trend}. Ошибка API."
 
-def generate_image(trend):
-    # Используй сервис генерации изображений (например, Bing Image Creator или DALL·E)
-    # Тут пример для Bing Image Creator (замени на свой API/метод)
+
+def generate_image_url(trend):
     bing_api_key = os.getenv("BING_IMAGE_API_KEY")
+    if not bing_api_key:
+        return "https://via.placeholder.com/600x400.png?text=Image+Generation+Failed" # Заглушка
     url = "https://api.bing.microsoft.com/v7.0/images/search"
-    params = {"q": trend, "count": 1, "safeSearch": "Moderate"}
+    params = {"q": f"{trend} digital art illustration", "count": 1, "safeSearch": "Moderate"}
     headers = {"Ocp-Apim-Subscription-Key": bing_api_key}
     response = requests.get(url, headers=headers, params=params)
-    img_url = response.json()["value"][0]["contentUrl"]
-    return img_url
+    if response.status_code == 200 and response.json().get("value"):
+        return response.json()["value"]["contentUrl"]
+    else:
+        return "https://via.placeholder.com/600x400.png?text=Image+Not+Found" # Заглушка
 
 def post_to_telegram(text, img_url):
-    # Скачаем картинку
     img_data = requests.get(img_url).content
     files = {"photo": ("image.jpg", img_data)}
     data = {
         "chat_id": TELEGRAM_CHANNEL_ID,
-        "caption": text,
+        "caption": text[:1024], # У Telegram есть лимит на подпись к фото
         "parse_mode": "HTML"
     }
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
-    requests.post(url, data=data, files=files)
+    response = requests.post(url, data=data, files=files)
+    return response.json()
 
-def job():
-    print(f"[{datetime.now()}] Запуск задачи...")
+# Основная логика, которая будет выполняться при каждом запуске GitHub Actions
+if __name__ == "__main__":
+    print("Запуск задачи...")
     trends = get_trends()
     if not trends:
-        print("Нет трендов.")
-        return
+        print("Тренды не найдены. Используем тему по умолчанию.")
+        trends = ["новые функции Telegram для бизнеса"]
+    
     trend = random.choice(trends)
+    print(f"Выбран тренд: {trend}")
+    
     text = generate_text(trend)
-    img_url = generate_image(trend)
-    post_to_telegram(text, img_url)
+    print("Текст сгенерирован.")
+    
+    img_url = generate_image_url(trend)
+    print(f"URL изображения: {img_url}")
+
+    result = post_to_telegram(text, img_url)
     print("Пост отправлен!")
+    print(f"Ответ от Telegram API: {result}")
 
-def schedule_jobs():
-    scheduler = BlockingScheduler(timezone=TZ)
-    for t in POST_TIMES:
-        hour, minute = map(int, t.split(":"))
-        scheduler.add_job(job, "cron", hour=hour, minute=minute)
-    print("Планировщик стартует...")
-    scheduler.start()
-
-if __name__ == "__main__":
-    schedule_jobs()
