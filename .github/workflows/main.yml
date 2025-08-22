@@ -1,0 +1,39 @@
+name: Run Telegram Content Bot
+
+on:
+  schedule:
+    # Запускает скрипт в 8, 10, 14, 17 и 19 часов по UTC.
+    # GitHub Actions использует UTC, поэтому вам нужно будет скорректировать время.
+    # Белград (UTC+2), значит 8:00 станет 6:00 UTC.
+    - cron: '0 6,8,12,15,17 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Загружает код из вашего репозитория
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Устанавливает Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10' # Вы можете выбрать нужную версию
+
+      # 3. Устанавливает зависимости из requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4. Запускает ваш основной Python-скрипт
+      - name: Run Python script
+        env:
+          # Передаем секреты в скрипт как переменные окружения
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          BING_IMAGE_API_KEY: ${{ secrets.BING_IMAGE_API_KEY }}
+        run: python bot_script.py
