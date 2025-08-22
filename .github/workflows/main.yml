@@ -1,37 +1,44 @@
-name: Run Telegram Content Bot
+# Название рабочего процесса, которое будет отображаться на GitHub
+name: Auto-posting Bot for Telegram
 
+# События, которые запускают этот рабочий процесс
 on:
-  schedule:
-    # Запускает скрипт в 8, 10, 14, 17 и 19 часов по UTC.
-    # GitHub Actions использует UTC, поэтому вам нужно будет скорректировать время.
-    # Белград (UTC+2), значит 8:00 станет 6:00 UTC.
-    - cron: '0 6,8,12,15,17 * * *'
+  # 1. Позволяет запускать вручную для тестов
+  workflow_dispatch:
 
+  # 2. Запускает по расписанию
+  schedule:
+    # Запускает каждые 4 часа
+    - cron: '0 */4 * * *'
+
+# Задачи, которые будут выполняться
 jobs:
-  build:
+  build_and_post:
+    # Используем последнюю версию Ubuntu в качестве операционной системы
     runs-on: ubuntu-latest
 
+    # Шаги, которые выполняются последовательно
     steps:
-      # 1. Загружает код из вашего репозитория
+      # Шаг 1: Клонирование вашего репозитория
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # 2. Устанавливает Python
+      # Шаг 2: Установка Python
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # Вы можете выбрать нужную версию
+          python-version: '3.11'
 
-      # 3. Устанавливает зависимости из requirements.txt
+      # Шаг 3: Установка зависимостей
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Запускает ваш основной Python-скрипт
-      - name: Run Python script
+      # Шаг 4: Запуск основного скрипта
+      - name: Run the bot script
         env:
-          # Передаем секреты в скрипт как переменные окружения
+          # Передаем секреты из GitHub в скрипт как переменные окружения
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
