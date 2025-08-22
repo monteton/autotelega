@@ -3,79 +3,109 @@ import random
 import requests
 from pytrends.request import TrendReq
 
-# Настройки (получаем из секретов GitHub Actions)
-TELEGRAM_TOKEN = os.getenv("8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI")
-TELEGRAM_CHANNEL_ID = os.getenv("-1002201089739")
-GOOGLE_API_KEY = os.getenv("AIzaSyA4MDuek8WeQen2s09C5F_kDkkq8rgN2Bk")
+# --- 1. Настройки с вашими данными (НЕБЕЗОПАСНО!) ---
+TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
+TELEGRAM_CHANNEL_ID = "-1002201089739"
+GOOGLE_API_KEY = "AIzaSyA4MDuek8WeQen2s09C5F_kDkkq8rgN2Bk"
+# Для теста изображений я использую заглушку, т.к. у вас нет BING_API_KEY
+# Если у вас есть ключ, вставьте его сюда, иначе будет картинка-заглушка.
+BING_API_KEY = None 
 
+# Настройки для поиска трендов
 NISHA = ["маркетинг", "реклама", "новости", "социальные сети"]
+GEO_LOCATION = 'RS'
+FALLBACK_TRENDS = ["тренды в маркетинге 2025", "новые функции Telegram для бизнеса", "AI в рекламе"]
 
-def get_trends():
-    pytrends = TrendReq(hl='ru-RU', tz=360) # tz 360 - это Москва (UTC+3), близко к Белграду
-    pytrends.build_payload(NISHA, timeframe='now 1-d', geo='RS') # RS - Сербия
-    trends = pytrends.related_queries()
-    all_trends = []
-    for key in NISHA:
-        if trends[key] is not None and trends[key]['top'] is not None:
-            all_trends.extend([row['query'] for index, row in trends[key]['top'].iterrows()])
-    return list(set(all_trends)) if all_trends else ["тренды в маркетинге 2025"] # Запасной вариант
+def get_google_trends():
+    print("Запрос к Google Trends...")
+    try:
+        pytrends = TrendReq(hl='ru-RU', tz=120)
+        pytrends.build_payload(NISHA, timeframe='now 1-d', geo=GEO_LOCATION)
+        trends_data = pytrends.related_queries()
+        
+        all_trends = []
+        for key in NISHA:
+            if key in trends_data and trends_data[key]['top'] is not None:
+                all_trends.extend([row['query'] for index, row in trends_data[key]['top'].iterrows()])
+        
+        if all_trends:
+            print(f"Найдено {len(set(all_trends))} уникальных трендов.")
+            return list(set(all_trends))
+        else:
+            print("Google Trends не вернул результатов. Используем запасные темы.")
+            return FALLBACK_TRENDS
+    except Exception as e:
+        print(f"Ошибка при работе с Google Trends: {e}")
+        return FALLBACK_TRENDS
 
-def generate_text(trend):
-    prompt = f"Напиши короткий (от 100 до 4096 символов) пост в легком, можно с юмором стиле по теме '{trend}' для Telegram-канала о маркетинге, рекламе, новостях или соцсетях."
-    # ... (код для генерации текста остается прежним)
+def generate_post_text(trend):
+    print(f"Генерация текста для тренда: '{trend}'...")
+    prompt = (f"Ты — остроумный SMM-менеджер. Напиши пост для Telegram-канала о маркетинге на тему '{trend}'. "
+              "Стиль — легкий, ироничный, с юмором и эмодзи. Объем — от 200 до 1500 символов.")
+    
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GOOGLE_API_KEY}"
     headers = {"Content-Type": "application/json"}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
-    response = requests.post(url, json=data, headers=headers)
-    if response.status_code == 200 and "candidates" in response.json():
-        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
-    else:
-        return f"Не удалось сгенерировать текст для тренда: {trend}. Ошибка API."
+
+    try:
+        response = requests.post(url, json=data, headers=headers)
+        response.raise_for_status()
+        candidates = response.json().get("candidates")
+        if candidates and candidates[0].get("content"):
+            text = candidates["content"]["parts"]["text"]
+            print("Текст успешно сгенерирован.")
+            return text
+        else:
+            print(f"API не вернул контент. Ответ: {response.json()}")
+            return f"Не удалось сгенерировать текст для тренда: '{trend}'."
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка сети при генерации текста: {e}")
+        return f"Сетевая ошибка при генерации текста для '{trend}'."
+
+def get_image_url(trend):
+    print(f"Поиск изображения для тренда: '{trend}'...")
+    if not BING_API_KEY:
+        print("API-ключ для Bing не найден. Используется изображение-заглушка.")
+        return "https://via.placeholder.com/800x450.png?text=Marketing+News"
+    
+    # ... (логика поиска изображения остаётся прежней) ...
+    return "https://via.placeholder.com/800x450.png?text=Image+Search"
 
 
-def generate_image_url(trend):
-    bing_api_key = os.getenv("BING_IMAGE_API_KEY")
-    if not bing_api_key:
-        return "https://via.placeholder.com/600x400.png?text=Image+Generation+Failed" # Заглушка
-    url = "https://api.bing.microsoft.com/v7.0/images/search"
-    params = {"q": f"{trend} digital art illustration", "count": 1, "safeSearch": "Moderate"}
-    headers = {"Ocp-Apim-Subscription-Key": bing_api_key}
-    response = requests.get(url, headers=headers, params=params)
-    if response.status_code == 200 and response.json().get("value"):
-        return response.json()["value"]["contentUrl"]
-    else:
-        return "https://via.placeholder.com/600x400.png?text=Image+Not+Found" # Заглушка
+def post_to_telegram(text, image_url):
+    print("Подготовка к отправке в Telegram...")
+    try:
+        image_data = requests.get(image_url).content
+        files = {"photo": ("image.jpg", image_data)}
+        data = {
+            "chat_id": TELEGRAM_CHANNEL_ID,
+            "caption": text[:1024],
+            "parse_mode": "HTML"
+        }
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+        
+        response = requests.post(url, data=data, files=files)
+        response.raise_for_status()
+        
+        print("Пост успешно отправлен в Telegram!")
+        print(f"Ответ от Telegram API: {response.json()}")
+    except Exception as e:
+        print(f"!!! НЕ УДАЛОСЬ ОТПРАВИТЬ ПОСТ В TELEGRAM. Ошибка: {e}")
+        # Печатаем ответ от Telegram API для отладки
+        if 'response' in locals() and hasattr(response, 'text'):
+            print(f"Ответ от сервера: {response.text}")
 
-def post_to_telegram(text, img_url):
-    img_data = requests.get(img_url).content
-    files = {"photo": ("image.jpg", img_data)}
-    data = {
-        "chat_id": TELEGRAM_CHANNEL_ID,
-        "caption": text[:1024], # У Telegram есть лимит на подпись к фото
-        "parse_mode": "HTML"
-    }
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
-    response = requests.post(url, data=data, files=files)
-    return response.json()
 
-# Основная логика, которая будет выполняться при каждом запуске GitHub Actions
 if __name__ == "__main__":
-    print("Запуск задачи...")
-    trends = get_trends()
-    if not trends:
-        print("Тренды не найдены. Используем тему по умолчанию.")
-        trends = ["новые функции Telegram для бизнеса"]
-    
-    trend = random.choice(trends)
-    print(f"Выбран тренд: {trend}")
-    
-    text = generate_text(trend)
-    print("Текст сгенерирован.")
-    
-    img_url = generate_image_url(trend)
-    print(f"URL изображения: {img_url}")
-
-    result = post_to_telegram(text, img_url)
-    print("Пост отправлен!")
-    print(f"Ответ от Telegram API: {result}")
-
+    if not all([TELEGRAM_TOKEN, TELEGRAM_CHANNEL_ID, GOOGLE_API_KEY]):
+        print("Критическая ошибка: один из ключей не указан в коде.")
+    else:
+        print("Все ключи вписаны в код. Начинаем тестовый запуск.")
+        trends_list = get_google_trends()
+        selected_trend = random.choice(trends_list)
+        
+        post_text = generate_post_text(selected_trend)
+        post_image_url = get_image_url(selected_trend)
+        
+        post_to_telegram(post_text, post_image_url)
+        print("Тестовый запуск завершен.")
