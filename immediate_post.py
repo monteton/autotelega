@@ -7,17 +7,19 @@ import textwrap
 import os
 from datetime import datetime
 import json
-import googlesearch
-from bs4 import BeautifulSoup
-import time
+from google import genai
+from google.genai import types
 
 # Конфигурация
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
 TELEGRAM_CHANNEL_ID = "-1002201089739"
-DEEPSEEK_API_KEY = "sk-7626d74465214867ad209d783d89d01d"
+GEMINI_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"
 
 NISHA = ["маркетинг", "реклама", "новости", "социальные сети", "digital", "SMM"]
 GEO_LOCATION = 'RU'
+
+# Инициализируем клиент Gemini
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 def get_google_trends():
     """Получение актуальных трендов из Google Trends"""
@@ -35,134 +37,143 @@ def get_google_trends():
         # Фильтруем только релевантные тренды
         filtered_trends = [t for t in all_trends if any(niche in t.lower() for niche in NISHA)]
         
-        return list(set(filtered_trends)) if filtered_trends else []
+        return list(set(filtered_trends)) if filtered_trends else get_fallback_trends()
         
     except Exception as e:
         print(f"❌ Ошибка Google Trends: {e}")
-        return []
+        return get_fallback_trends()
 
-def search_trend_info(trend):
-    """Поиск информации о тренде в интернете"""
-    print(f"🔍 Поиск информации о: {trend}")
+def get_fallback_trends():
+    """Резервные тренды если Google Trends не работает"""
+    current_date = datetime.now().strftime("%Y")
+    return [
+        f"тренды digital маркетинга {current_date}",
+        f"новости социальных сетей {current_date}",
+        "SMM стратегии для малого бизнеса",
+        "контент маркетинг для привлечения клиентов",
+        "таргетированная реклама в соцсетях",
+        "нейросети в маркетинге и рекламе"
+    ]
+
+def generate_text_with_gemini(trend):
+    """Генерация поста через Gemini API"""
+    print("🧠 Генерация текста через Gemini API...")
     
-    try:
-        # Ищем новости по теме
-        search_results = []
-        for url in googlesearch.search(f"{trend} новости 2024", num=3, stop=3, pause=2):
-            search_results.append(url)
-        
-        # Парсим информацию с первых двух страниц
-        trend_info = []
-        for url in search_results[:2]:
-            try:
-                response = requests.get(url, timeout=10, headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                })
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # Извлекаем заголовки и первые абзацы
-                paragraphs = soup.find_all('p')
-                for p in paragraphs[:5]:
-                    text = p.get_text().strip()
-                    if len(text) > 100 and any(keyword in text.lower() for keyword in ['маркетинг', 'реклама', 'социальн', 'digital', 'smm']):
-                        trend_info.append(text)
-                        if len(trend_info) >= 3:
-                            break
-                
-                if len(trend_info) >= 3:
-                    break
-                    
-            except Exception as e:
-                continue
-        
-        return " ".join(trend_info) if trend_info else ""
-        
-    except Exception as e:
-        print(f"❌ Ошибка поиска информации: {e}")
-        return ""
-
-def generate_text_with_deepseek(trend, context=""):
-    """Генерация поста через DeepSeek API с контекстом"""
-    print("🧠 Генерация текста через DeepSeek...")
-    
-    if context:
-        prompt = f"""На основе этой информации о тренде "{trend}":
-{context}
-
-Создай профессиональный пост для Telegram-канала о маркетинге.
+    prompt = f"""Создай профессиональный пост для Telegram-канала о маркетинге и рекламе на тему: "{trend}"
 
 Требования:
-- Используй ТОЛЬКО информацию из предоставленного контекста
-- Добавь конкретные цифры и факты если они есть
-- Сделай пост информативным и интересным
+- Пост должен быть основан на реальных трендах и фактах 2024 года
+- Добавь конкретные цифры, статистику и полезные инсайты
 - Длина: 250-400 символов
-- Стиль: профессиональный, но доступный
+- Стиль: профессиональный, но доступный и engaging
 - Добавь эмодзи и призыв к обсуждению
-- Не придумывай информацию которой нет в контексте"""
-    else:
-        prompt = f"""Создай профессиональный пост для Telegram-канала о маркетинге на тему: "{trend}"
+- Сделай 2-3 абзаца для лучшей читаемости
+- В конце добавь 3-4 релевантных хештега
 
-Основа пост на реальных данных и трендах 2024 года. 
-Добавь конкретные цифры, факты и полезную информацию.
-Длина: 250-400 символов. Стиль: профессиональный с элементами легкости."""
+Пример хорошего поста:
+🚀 Тренды Digital-маркетинга 2024
+
+По данным исследований, видео-контент показывает рост вовлеченности на 85% по сравнению с прошлым годом. Short-form video доминирует в соцсетях!
+
+Ключевые изменения:
+• AI-генерация контента +200% эффективности
+• Персонализация на основе данных +45% конверсии
+• Voice search оптимизация +30% трафика
+
+Какие тренды уже используете в своих кампаниях? 💬
+
+#маркетинг #тренды2024 #digital"""
 
     try:
-        url = "https://api.deepseek.com/v1/chat/completions"
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                top_p=0.8,
+                max_output_tokens=500
+            )
+        )
         
-        headers = {
-            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-            "Content-Type": "application/json"
-        }
+        generated_text = response.text.strip()
+        print("✅ Текст успешно сгенерирован через Gemini")
+        return generated_text
         
-        data = {
-            "model": "deepseek-chat",
-            "messages": [
-                {
-                    "role": "system", 
-                    "content": "Ты эксперт по digital-маркетингу. Создавай только фактчекинг посты на основе предоставленной информации. Не придумывай факты."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "max_tokens": 500,
+    except Exception as e:
+        print(f"❌ Ошибка Gemini API: {e}")
+        return generate_text_direct_api(trend)
+
+def generate_text_direct_api(trend):
+    """Прямой запрос к Gemini API через HTTP"""
+    print("🌐 Прямой запрос к Gemini API...")
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": f"""Создай профессиональный пост для Telegram-канала о маркетинге на тему: "{trend}".
+
+Пост должен содержать:
+- Конкретные цифры и статистику
+- Полезные инсайты для маркетологов
+- Призыв к обсуждению
+- 3-4 релевантных хештега
+- Длина: 250-400 символов
+- Стиль: профессиональный с элементами легкости
+
+Основа пост на реальных трендах 2024 года."""
+                    }
+                ]
+            }
+        ],
+        "generationConfig": {
             "temperature": 0.7,
-            "top_p": 0.8
+            "topP": 0.8,
+            "maxOutputTokens": 500
         }
-        
-        response = requests.post(url, headers=headers, json=data, timeout=20)
+    }
+    
+    try:
+        response = requests.post(
+            url, 
+            headers={'Content-Type': 'application/json'},
+            json=payload,
+            timeout=30
+        )
         
         if response.status_code == 200:
             result = response.json()
-            generated_text = result['choices'][0]['message']['content']
-            print("✅ Текст успешно сгенерирован через DeepSeek")
-            return generated_text.strip()
+            text = result['candidates'][0]['content']['parts'][0]['text']
+            print("✅ Текст успешно сгенерирован через прямой API")
+            return text.strip()
         else:
-            print(f"❌ Ошибка DeepSeek API: {response.status_code}")
+            print(f"❌ Ошибка прямого API: {response.status_code}")
             return None
             
     except Exception as e:
-        print(f"❌ Ошибка при запросе к DeepSeek: {e}")
+        print(f"❌ Ошибка прямого запроса: {e}")
         return None
 
 def generate_image(trend):
     """Генерация картинки для поста"""
     try:
         width, height = 1000, 500
-        image = Image.new('RGB', (width, height), color=(20, 30, 40))
+        image = Image.new('RGB', (width, height), color=(25, 35, 45))
         draw = ImageDraw.Draw(image)
         
         # Градиентный фон
         for i in range(height):
-            r = int(20 + (i / height) * 25)
-            g = int(30 + (i / height) * 20)
-            b = int(40 + (i / height) * 25)
+            r = int(25 + (i / height) * 20)
+            g = int(35 + (i / height) * 15)
+            b = int(45 + (i / height) * 20)
             draw.line([(0, i), (width, i)], fill=(r, g, b))
         
         try:
-            title_font = ImageFont.truetype("arialbd.ttf", 42)
-            text_font = ImageFont.truetype("arial.ttf", 28)
+            title_font = ImageFont.truetype("arialbd.ttf", 46)
+            text_font = ImageFont.truetype("arial.ttf", 32)
         except:
             title_font = ImageFont.load_default()
             text_font = ImageFont.load_default()
@@ -171,7 +182,7 @@ def generate_image(trend):
         title = "АКТУАЛЬНЫЙ ТРЕНД"
         bbox = draw.textbbox((0, 0), title, font=title_font)
         title_width = bbox[2] - bbox[0]
-        draw.text(((width - title_width) // 2, 100), title, font=title_font, fill=(255, 215, 0))
+        draw.text(((width - title_width) // 2, 120), title, font=title_font, fill=(255, 215, 0))
         
         # Основной текст
         wrapped_text = textwrap.fill(trend, width=25)
@@ -180,7 +191,7 @@ def generate_image(trend):
         draw.text((width // 2, 280), wrapped_text, font=text_font, fill=(255, 255, 255), anchor="mm")
         
         # Декоративные элементы
-        draw.rectangle([40, 40, width-40, height-40], outline=(255, 215, 0), width=3)
+        draw.rectangle([40, 40, width-40, height-40], outline=(255, 215, 0), width=4)
         
         img_byte_arr = io.BytesIO()
         image.save(img_byte_arr, format='PNG')
@@ -230,26 +241,23 @@ def main():
     
     # Получаем тренды из Google Trends
     trends = get_google_trends()
+    print(f"📊 Найдены тренды: {trends}")
+    
     if not trends:
         print("❌ Не удалось получить тренды")
         return 1
-        
-    print(f"📊 Найдены тренды: {trends}")
     
     # Выбираем случайный тренд
     selected_trend = random.choice(trends)
     print(f"🎯 Выбран тренд: {selected_trend}")
     
-    # Ищем информацию о тренде
-    trend_info = search_trend_info(selected_trend)
+    # Генерируем текст через Gemini
+    text = generate_text_with_gemini(selected_trend)
     
-    # Генерируем текст через DeepSeek
-    text = generate_text_with_deepseek(selected_trend, trend_info)
-    
-    # Если генерация не удалась, пробуем без контекста
+    # Если не удалось через SDK, пробуем прямой API
     if not text:
-        print("🔄 Повторная попытка генерации без контекста...")
-        text = generate_text_with_deepseek(selected_trend)
+        print("🔄 Попытка через прямой API...")
+        text = generate_text_direct_api(selected_trend)
     
     if not text:
         print("❌ Не удалось сгенерировать текст")
@@ -272,8 +280,8 @@ def main():
         return 1
 
 if __name__ == "__main__":
-    # Установите зависимости: 
-    # pip install pytrends requests Pillow beautifulsoup4 google-search-results
+    # Установите зависимости:
+    # pip install pytrends requests Pillow google-genai
     
     exit_code = main()
     exit(exit_code)
