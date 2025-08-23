@@ -10,6 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
+    env:
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+      GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -23,17 +28,16 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install pytrends requests Pillow
 
-    - name: Set environment variables from secrets
+    - name: Verify environment variables
       run: |
-        echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" >> $GITHUB_ENV
-        echo "TELEGRAM_CHANNEL_ID=${{ secrets.TELEGRAM_CHANNEL_ID }}" >> $GITHUB_ENV
-        echo "GROK_API_KEY=${{ secrets.GROK_API_KEY }}" >> $GITHUB_ENV
-        echo "✅ Environment variables set from GitHub Secrets"
+        echo "TELEGRAM_TOKEN length: ${#TELEGRAM_TOKEN}"
+        echo "TELEGRAM_CHANNEL_ID: $TELEGRAM_CHANNEL_ID"
+        echo "GROK_API_KEY starts with: ${GROK_API_KEY:0:10}..."
 
     - name: Run Telegram Poster
-      run: python -m src.main
+      run: python main.py
 
     - name: Notify on failure
       if: failure()
