@@ -2,12 +2,11 @@ import random
 import requests
 from pytrends.request import TrendReq
 
-# Ваши ключи
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
 TELEGRAM_CHANNEL_ID = "-1002201089739"
-GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"  # Используйте ваш ключ Google API
+GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"
 
-NISHA = ["маркетинг", "реклама",, "социальные сети"]
+NISHA = ["маркетинг", "реклама", "социальные сети"]
 GEO_LOCATION = 'RS'
 FALLBACK_TRENDS = ["тренды в маркетинге 2025", "новые функции Telegram", "AI в рекламе"]
 
