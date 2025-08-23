@@ -1,8 +1,9 @@
 import random
 import requests
 from pytrends.request import TrendReq
+from google import genai
 
-# Ваши ключи
+# Ваши ключи (оставлены открытыми по просьбе)
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
 TELEGRAM_CHANNEL_ID = "-1002201089739"
 GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"
@@ -26,36 +27,15 @@ def get_google_trends():
         print(f"Ошибка Google Trends: {e}")
         return FALLBACK_TRENDS
 
-def generate_post_text_gemini_flash(prompt, api_key):
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-    headers = {
-        "Content-Type": "application/json",
-        "X-goog-api-key": api_key
-    }
-    data = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt}
-                ]
-            }
-        ]
-    }
-    response = requests.post(url, headers=headers, json=data)
-    response.raise_for_status()
-    result = response.json()
-    print("Полный ответ API:", result)  # для отладки структуры
-
-    candidate = result['candidates'][0]
-    content = candidate['content']
-
-    # content - список, берем первый элемент
-    part = content
-
-    # В part берем список parts и берем у первого элемента поле 'text'
-    text = part['parts']['text']
-
-    return text
+def generate_post_text_gemini(prompt, api_key):
+    print("Генерация текста через Google Gemini API...")
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=[prompt]
+    )
+    # Обычно response.text содержит ответ сгенерированного текста
+    return response.text
 
 def post_to_telegram(text):
     print("Отправка в Telegram...")
@@ -74,10 +54,12 @@ if __name__ == "__main__":
     trends = get_google_trends()
     selected_trend = random.choice(trends)
     prompt = f"Напиши короткий остроумный пост для Telegram-канала на тему '{selected_trend}'."
+    
     try:
-        text = generate_post_text_gemini_flash(prompt, GOOGLE_API_KEY)
+        text = generate_post_text_gemini(prompt, GOOGLE_API_KEY)
     except Exception as e:
         text = f"Ошибка при генерации текста: {e}"
         print(text)
+
     post_to_telegram(text)
     print("Готово.")
