@@ -2,9 +2,10 @@ import random
 import requests
 from pytrends.request import TrendReq
 
+# Ваши ключи — замените на свои
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
 TELEGRAM_CHANNEL_ID = "-1002201089739"
-GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"
+GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"  # Ваш Google API Key
 
 NISHA = ["маркетинг", "реклама", "социальные сети"]
 GEO_LOCATION = 'RS'
@@ -22,7 +23,7 @@ def get_google_trends():
                 all_trends.extend([row['query'] for _, row in trends_data[key]['top'].iterrows()])
         return list(set(all_trends)) if all_trends else FALLBACK_TRENDS
     except Exception as e:
-        print(f"Ошибка Google Trends: {e}")
+        print(f"Ошибка Google Trends: {e}. Использую запасные темы.")
         return FALLBACK_TRENDS
 
 def generate_post_text_gemini_flash(prompt, api_key):
@@ -43,7 +44,22 @@ def generate_post_text_gemini_flash(prompt, api_key):
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
     result = response.json()
-    text = result['candidates'][0]['content']['parts']['text']
+    print("Полный ответ API:", result)  # Для отладки
+
+    candidate = result['candidates'][0]
+    content = candidate.get('content')
+
+    # Обработка, если content — это список или словарь
+    if isinstance(content, list):
+        part = content
+    else:
+        part = content
+    
+    if isinstance(part, dict) and 'parts' in part:
+        text = part['parts'].get('text', '')
+    else:
+        text = part.get('text', '') if isinstance(part, dict) else ''
+
     return text
 
 def post_to_telegram(text):
