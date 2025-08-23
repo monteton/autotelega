@@ -2,7 +2,7 @@ import random
 import requests
 from pytrends.request import TrendReq
 
-# Ваши ключи и настройки
+# Ваши ключи
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
 TELEGRAM_CHANNEL_ID = "-1002201089739"
 GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"
@@ -49,10 +49,10 @@ def generate_post_text_gemini_flash(prompt, api_key):
     candidate = result['candidates'][0]
     content = candidate['content']
 
-    # content — список
+    # content - список, берем первый элемент
     part = content
 
-    # В части берем список parts и первый элемент
+    # В part берем список parts и берем у первого элемента поле 'text'
     text = part['parts']['text']
 
     return text
