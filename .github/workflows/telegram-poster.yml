@@ -23,17 +23,24 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytrends requests Pillow python-dotenv
+        pip install -r requirements.txt
 
-    - name: Create .env file from GitHub Secrets
+    - name: Create .env file from secrets
       run: |
-        echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" > .env
-        echo "TELEGRAM_CHANNEL_ID=${{ secrets.TELEGRAM_CHANNEL_ID }}" >> .env
-        echo "GROK_API_KEY=${{ secrets.GROK_API_KEY }}" >> .env
-        echo "✅ .env file created from GitHub Secrets"
+        cat > .env << EOF
+        TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}
+        TELEGRAM_CHANNEL_ID=${{ secrets.TELEGRAM_CHANNEL_ID }}
+        GROK_API_KEY=${{ secrets.GROK_API_KEY }}
+        EOF
+        
+        # Для проверки (не показываем значения в логах)
+        echo "✅ .env file created successfully"
+        echo "TELEGRAM_TOKEN=***"
+        echo "TELEGRAM_CHANNEL_ID=***" 
+        echo "GROK_API_KEY=***"
 
     - name: Run Telegram Poster
-      run: python immediate_post.py
+      run: python src/main.py
 
     - name: Notify on failure
       if: failure()
