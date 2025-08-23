@@ -2,6 +2,7 @@ import random
 import requests
 from pytrends.request import TrendReq
 
+# Ваши ключи и настройки
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
 TELEGRAM_CHANNEL_ID = "-1002201089739"
 GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"
@@ -43,33 +44,21 @@ def generate_post_text_gemini_flash(prompt, api_key):
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
     result = response.json()
-    print("Полный ответ API:", result)  # Для отладки
+    print("Полный ответ API:", result)  # для отладки структуры
 
     candidate = result['candidates'][0]
-    content = candidate.get('content')
+    content = candidate['content']
 
-    # content — список или словарь
-    if isinstance(content, list):
-        part = content
-    else:
-        part = content
+    # content — список
+    part = content
 
-    # parts — список, берем первый элемент
-    if isinstance(part, dict) and 'parts' in part:
-        parts_list = part['parts']
-        if isinstance(parts_list, list) and len(parts_list) > 0:
-            text = parts_list.get('text', '')
-        else:
-            text = ''
-    elif isinstance(part, dict):
-        text = part.get('text', '')
-    else:
-        text = ''
+    # В части берем список parts и первый элемент
+    text = part['parts']['text']
 
     return text
 
 def post_to_telegram(text):
-    print("Отправка поста в Telegram...")
+    print("Отправка в Telegram...")
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = {
         "chat_id": TELEGRAM_CHANNEL_ID,
