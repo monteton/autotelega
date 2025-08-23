@@ -1,12 +1,11 @@
 import random
 import requests
-import time
-import schedule
-from datetime import datetime
 from pytrends.request import TrendReq
 from PIL import Image, ImageDraw, ImageFont
 import io
 import textwrap
+import os
+from datetime import datetime
 
 # Конфигурация
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
@@ -14,7 +13,6 @@ TELEGRAM_CHANNEL_ID = "-1002201089739"
 
 NISHA = ["маркетинг", "реклама", "новости", "социальные сети"]
 GEO_LOCATION = 'RS'
-TIMEZONE = 'Europe/Belgrade'
 
 FALLBACK_TRENDS = [
     "тренды маркетинга 2025", "новости digital", "SMM стратегии",
@@ -41,43 +39,29 @@ def get_google_trends():
         return FALLBACK_TRENDS
 
 def generate_text(trend):
-    """Генерация текста поста с использованием открытых API"""
-    try:
-        # Попробуем использовать ChatGPT через неофициальный API
-        url = "https://api.deepseek.com/v1/chat/completions"
-        headers = {
-            "Authorization": "Bearer sk-your-free-key",  # Нужно получить бесплатный ключ
-            "Content-Type": "application/json"
-        }
-        
-        prompt = f"""Напиши короткий engaging пост для Telegram на тему '{trend}'. 
-        Стиль: легкий, с юмором, неформальный. Длина: 150-300 символов. 
-        Добавь эмодзи и призыв к обсуждению."""
-        
-        data = {
-            "model": "deepseek-chat",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 200
-        }
-        
-        response = requests.post(url, headers=headers, json=data, timeout=10)
-        
-        if response.status_code == 200:
-            return response.json()['choices'][0]['message']['content']
-            
-    except Exception:
-        pass  # Если API не работает, используем локальную генерацию
-    
-    # Локальная генерация текста
+    """Генерация текста поста"""
+    # Локальная генерация текста с юмором
     templates = [
         f"🔥 {trend} — вот это поворот! Что думаете? 🤔\n\nОбсудим в комментах? 👇",
         f"🚀 {trend} — тренд сезона! А вы в теме? 💫\n\nЖду ваши мнения! 💬",
         f"📈 {trend} — все только об этом и говорят! А вы? 🎯\n\nДавайте поспорим? 😄",
         f"💡 {trend} — гениально или переоценено? Ваше мнение! 🤷‍♂️\n\nПишите в комментарии! ✍️",
-        f"🌟 {trend} — вот это новость! Как вам? 🎉\n\nЖду ваши реакции! ❤️"
+        f"🌟 {trend} — вот это новость! Как вам? 🎉\n\nЖду ваши реакции! ❤️",
+        f"🎯 {trend} — хайп или действительно важно? Решаем вместе! 🤔\n\nВаши мысли?",
+        f"💥 {trend} — взрывная тема! Уже пробовали? 🚀\n\nДелитесь опытом!",
+        f"📱 {trend} — новый тренд в соцсетях! Успеете за хайпом? 🌊\n\nКак вам?",
+        f"🤖 {trend} — будущее уже здесь! Готовы? ⚡\n\nОбсудим?",
+        f"🎨 {trend} — креативный подход или банальность? Ваше мнение! 🎭"
     ]
     
-    return random.choice(templates)
+    text = random.choice(templates)
+    
+    # Добавляем хештеги
+    hashtags = ["#маркетинг", "#реклама", "#новости", "#соцсети", "#тренды", "#digital"]
+    random_hashtags = random.sample(hashtags, 3)
+    text += f"\n\n{' '.join(random_hashtags)}"
+    
+    return text
 
 def generate_image(trend):
     """Генерация картинки для поста"""
@@ -87,14 +71,17 @@ def generate_image(trend):
         image = Image.new('RGB', (width, height), color=(45, 45, 65))
         draw = ImageDraw.Draw(image)
         
-        # Загружаем шрифт (можно использовать стандартный)
+        # Пробуем разные шрифты
         try:
             font = ImageFont.truetype("arial.ttf", 36)
         except:
-            font = ImageFont.load_default()
+            try:
+                font = ImageFont.truetype("DejaVuSans.ttf", 36)
+            except:
+                font = ImageFont.load_default()
         
         # Форматируем текст
-        wrapped_text = textwrap.fill(trend, width=30)
+        wrapped_text = textwrap.fill(trend, width=25)
         
         # Рисуем текст
         bbox = draw.textbbox((0, 0), wrapped_text, font=font)
@@ -105,6 +92,9 @@ def generate_image(trend):
         y = (height - text_height) / 2
         
         draw.text((x, y), wrapped_text, font=font, fill=(255, 215, 0))
+        
+        # Добавляем декоративные элементы
+        draw.rectangle([50, 50, width-50, height-50], outline=(255, 215, 0), width=2)
         
         # Сохраняем в байтовый поток
         img_byte_arr = io.BytesIO()
@@ -125,7 +115,7 @@ def post_to_telegram(text, image_bytes=None):
         if image_bytes:
             # Отправка с картинкой
             url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
-            files = {'photo': ('image.png', image_bytes, 'image/png')}
+            files = {'photo': ('trend_image.png', image_bytes, 'image/png')}
             data = {
                 'chat_id': TELEGRAM_CHANNEL_ID,
                 'caption': text,
@@ -150,9 +140,10 @@ def post_to_telegram(text, image_bytes=None):
         print(f"❌ Ошибка отправки в Telegram: {e}")
         return False
 
-def create_and_post():
-    """Создание и публикация поста"""
-    print(f"\n⏰ Запуск в {datetime.now().strftime('%H:%M:%S')}")
+def main():
+    """Основная функция"""
+    print("🤖 Запуск генерации поста...")
+    print(f"⏰ Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Получаем тренды
     trends = get_google_trends()
@@ -175,37 +166,14 @@ def create_and_post():
     
     if success:
         print("🎉 Пост успешно опубликован!")
+        return 0
     else:
         print("⚠️ Завершено с ошибками.")
-
-def main():
-    """Основная функция"""
-    print("🤖 Бот запущен!")
-    print("⏰ Расписание: 8:00, 10:00, 14:00, 17:00, 19:00 (время Белграда)")
-    
-    # Настраиваем расписание
-    schedule.every().day.at("08:00").do(create_and_post)
-    schedule.every().day.at("10:00").do(create_and_post)
-    schedule.every().day.at("14:00").do(create_and_post)
-    schedule.every().day.at("17:00").do(create_and_post)
-    schedule.every().day.at("19:00").do(create_and_post)
-    
-    # Первый запуск сразу
-    print("🚀 Первый запуск...")
-    create_and_post()
-    
-    # Бесконечный цикл
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # Проверка каждую минуту
+        return 1
 
 if __name__ == "__main__":
     # Установите зависимости:
-    # pip install pytrends requests schedule Pillow
+    # pip install pytrends requests Pillow
     
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n👋 Бот остановлен")
-    except Exception as e:
-        print(f"💥 Критическая ошибка: {e}")
+    exit_code = main()
+    exit(exit_code)
