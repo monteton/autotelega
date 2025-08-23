@@ -2,10 +2,9 @@ import random
 import requests
 from pytrends.request import TrendReq
 
-# Ваши ключи — замените на свои
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
 TELEGRAM_CHANNEL_ID = "-1002201089739"
-GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"  # Ваш Google API Key
+GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"
 
 NISHA = ["маркетинг", "реклама", "социальные сети"]
 GEO_LOCATION = 'RS'
@@ -23,7 +22,7 @@ def get_google_trends():
                 all_trends.extend([row['query'] for _, row in trends_data[key]['top'].iterrows()])
         return list(set(all_trends)) if all_trends else FALLBACK_TRENDS
     except Exception as e:
-        print(f"Ошибка Google Trends: {e}. Использую запасные темы.")
+        print(f"Ошибка Google Trends: {e}")
         return FALLBACK_TRENDS
 
 def generate_post_text_gemini_flash(prompt, api_key):
@@ -49,21 +48,28 @@ def generate_post_text_gemini_flash(prompt, api_key):
     candidate = result['candidates'][0]
     content = candidate.get('content')
 
-    # Обработка, если content — это список или словарь
+    # content — список или словарь
     if isinstance(content, list):
         part = content
     else:
         part = content
-    
+
+    # parts — список, берем первый элемент
     if isinstance(part, dict) and 'parts' in part:
-        text = part['parts'].get('text', '')
+        parts_list = part['parts']
+        if isinstance(parts_list, list) and len(parts_list) > 0:
+            text = parts_list.get('text', '')
+        else:
+            text = ''
+    elif isinstance(part, dict):
+        text = part.get('text', '')
     else:
-        text = part.get('text', '') if isinstance(part, dict) else ''
+        text = ''
 
     return text
 
 def post_to_telegram(text):
-    print("Отправка в Telegram...")
+    print("Отправка поста в Telegram...")
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = {
         "chat_id": TELEGRAM_CHANNEL_ID,
