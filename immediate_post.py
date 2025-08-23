@@ -1,7 +1,6 @@
 import random
 import requests
 from pytrends.request import TrendReq
-import google.generativeai as genai
 
 # Токены (тестовые)
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
@@ -29,10 +28,19 @@ def get_google_trends():
 
 def generate_post_text_gemini(prompt, api_key):
     print("Генерация текста через Google Gemini API...")
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-pro')
-    response = model.generate_content(prompt)
-    return response.text
+    try:
+        # Пытаемся импортировать только когда нужно
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-pro')
+        response = model.generate_content(prompt)
+        return response.text
+    except ImportError:
+        print("Библиотека google-generativeai не установлена. Использую заглушку...")
+        return f"🚀 {prompt.split('на тему ')[1].replace("'", '')}\n\nИнтересная тема для обсуждения! Что вы думаете об этом?"
+    except Exception as e:
+        print(f"Ошибка генерации текста: {e}")
+        return f"🚀 {prompt.split('на тему ')[1].replace("'", '')}\n\nКрутая тема! Давайте обсудим в комментариях."
 
 def post_to_telegram(text):
     print("Отправка в Telegram...")
@@ -64,12 +72,8 @@ if __name__ == "__main__":
     
     # Генерируем пост
     prompt = f"Напиши короткий остроумный пост для Telegram-канала на тему '{selected_trend}'. Пост должен быть интересным и engaging."
-    try:
-        text = generate_post_text_gemini(prompt, GOOGLE_API_KEY)
-        print(f"Сгенерированный текст: {text}")
-    except Exception as e:
-        text = f"🚀 {selected_trend}\n\nК сожалению, не удалось сгенерировать креативный текст, но тема очень перспективная! Что думаете об этом?"
-        print(f"Ошибка при генерации текста: {e}")
+    text = generate_post_text_gemini(prompt, GOOGLE_API_KEY)
+    print(f"Сгенерированный текст:\n{text}")
     
     # Отправляем в Telegram
     success = post_to_telegram(text)
