@@ -6,11 +6,13 @@ import io
 import textwrap
 import os
 from datetime import datetime
+import json
+import base64
 
-# Конфигурация из переменных окружения
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI")
-TELEGRAM_CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID', "-1002201089739")
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU")
+# Конфигурация
+TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
+TELEGRAM_CHANNEL_ID = "-1002201089739"
+GROK_API_KEY = "xai-RW56kLsDPrR7Wwm4xj9QDXFkeVYVIFQ2BpnP507yuziqcWPUQTwGnxgzKVVqzWwFo3oOCopD3OOyStp1"
 
 NISHA = ["маркетинг", "реклама", "новости", "социальные сети", "digital", "SMM"]
 GEO_LOCATION = 'RU'
@@ -49,101 +51,109 @@ def get_fallback_trends():
         "нейросети в маркетинге и рекламе"
     ]
 
-def create_prompt(trend):
-    """Создание промпта для генерации текста"""
-    return f"""Создай профессиональный пост для Telegram-канала о маркетинге и рекламе на тему: "{trend}"
+def generate_text_with_grok(trend):
+    """Генерация поста через Grok API"""
+    print("🧠 Генерация текста через Grok API...")
+    
+    prompt = f"""Создай профессиональный пост для Telegram-канала о маркетинге и рекламе на тему: "{trend}"
 
 Требования:
-- Пост должен быть основан на реальных трендах и фактах 2024-2025 года
+- Пост должен быть основан на реальных трендах 2024-2025 года
 - Добавь конкретные цифры, статистику и полезные инсайты
 - Длина: 250-400 символов
 - Стиль: профессиональный, но доступный и engaging
 - Добавь эмодзи и призыв к обсуждению
 - Сделай 2-3 абзаца для лучшей читаемости
-- В конце добавь 3-4 релевантных хештега"""
+- В конце добавь 3-4 релевантных хештега
+- Используй только реальные факты и данные"""
 
-def generate_text_with_gemini(trend):
-    """Генерация поста через Gemini API"""
-    print("🧠 Генерация текста через Gemini API...")
-    
-    prompt = create_prompt(trend)
-    
     try:
-        # Прямой HTTP запрос к Gemini API
-        return generate_text_direct_api(trend, prompt)
-            
-    except Exception as e:
-        print(f"❌ Ошибка Gemini: {e}")
-        return None
-
-def generate_text_direct_api(trend, prompt):
-    """Прямой запрос к Gemini API через HTTP"""
-    print("🌐 Прямой запрос к Gemini API...")
-    
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-    
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": prompt
-                    }
-                ]
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.7,
-            "topP": 0.8,
-            "maxOutputTokens": 500
+        url = "https://api.x.ai/v1/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {GROK_API_KEY}",
+            "Content-Type": "application/json"
         }
-    }
-    
-    try:
-        response = requests.post(
-            url, 
-            headers={'Content-Type': 'application/json'},
-            json=payload,
-            timeout=30
-        )
+        
+        data = {
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": "Ты эксперт по digital-маркетингу с 10-летним опытом. Создавай качественные, информативные посты с конкретными данными и статистикой."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "model": "grok-4-latest",
+            "temperature": 0.7,
+            "max_tokens": 500,
+            "stream": False
+        }
+        
+        response = requests.post(url, headers=headers, json=data, timeout=30)
         
         if response.status_code == 200:
             result = response.json()
-            if 'candidates' in result and result['candidates']:
-                text = result['candidates'][0]['content']['parts'][0]['text']
-                print("✅ Текст успешно сгенерирован через прямой API")
-                return text.strip()
-            else:
-                print(f"❌ Неверный формат ответа: {result}")
-                return None
+            generated_text = result['choices'][0]['message']['content']
+            print("✅ Текст успешно сгенерирован через Grok API")
+            return generated_text.strip()
         else:
-            print(f"❌ Ошибка прямого API: {response.status_code} - {response.text}")
+            print(f"❌ Ошибка Grok API: {response.status_code} - {response.text}")
             return None
             
     except Exception as e:
-        print(f"❌ Ошибка прямого запроса: {e}")
+        print(f"❌ Ошибка при запросе к Grok: {e}")
         return None
 
-def generate_text_fallback(trend):
-    """Резервная генерация текста если API не работает"""
-    print("📝 Используем резервную генерацию текста...")
+def generate_image_with_grok(trend):
+    """Генерация картинки через Grok API"""
+    print("🎨 Генерация изображения через Grok API...")
     
-    fallback_texts = [
-        f"🚀 {trend}\n\nСогласно последним исследованиям, видео-контент показывает рост вовлеченности на 85% в 2024 году! 📈\n\nКлючевые тренды:\n• Short-form video доминирует\n• AI-генерация контента +200% эффективности\n• Персонализация на основе данных\n\nКакие инструменты используете для создания контента? 🎬\n\n#маркетинг #тренды2024 #digital",
+    try:
+        url = "https://api.x.ai/v1/images/generations"
         
-        f"🎯 {trend}\n\nНовые данные показывают рост мобильного трафика на 67% за последний квартал! 📱\n\nОсновные изменения:\n• Мобильная оптимизация +45% конверсии\n• Voice search +30% трафика\n• Instant apps +50% вовлеченности\n\nКак адаптируете стратегию под мобильных пользователей? 💡\n\n#мобильный #трафик #оптимизация",
+        headers = {
+            "Authorization": f"Bearer {GROK_API_KEY}",
+            "Content-Type": "application/json"
+        }
         
-        f"🔥 {trend}\n\nПрорыв в digital-рекламе! Компании сообщают о снижении стоимости привлечения на 35% при росте конверсии на 55%! 💰\n\nНовые подходы:\n• Contextual targeting\n• Predictive analytics\n• Automated bidding\n\nУже тестируете новые форматы рекламы? 🎯\n\n#реклама #digital #конверсия",
+        data = {
+            "model": "grok-image-gen-latest",
+            "prompt": f"Создай изображение для поста о маркетинге на тему '{trend}'. Стиль: профессиональный, современный, с элементами digital-арта. Добавь иконки связанные с маркетингом, соцсетями, аналитикой.",
+            "size": "1024x1024",
+            "quality": "standard",
+            "n": 1
+        }
         
-        f"📈 {trend}\n\nПо данным аналитиков, email-маркетинг показывает ROI до 4200% в 2024 году! ✉️\n\nЛучшие практики:\n• Персонализация +45% открытий\n• Automation +60% эффективности\n• Segmentation +35% конверсии\n\nКак строите email-стратегию? 💌\n\n#emailмаркетинг #ROI #автоматизация",
+        response = requests.post(url, headers=headers, json=data, timeout=60)
         
-        f"💫 {trend}\n\nНовая эра в социальных сетях! Stories и Reels показывают на 120% больше вовлеченности чем традиционные посты. 📲\n\nТоп-платформы:\n• Instagram Reels\n• TikTok\n• YouTube Shorts\n• Telegram Stories\n\nКакие форматы контента работают лучше всего? 🎥\n\n#smm #соцсети #контент"
-    ]
-    
-    return random.choice(fallback_texts)
+        if response.status_code == 200:
+            result = response.json()
+            image_url = result['data'][0]['url']
+            
+            # Скачиваем изображение
+            img_response = requests.get(image_url, timeout=30)
+            if img_response.status_code == 200:
+                img_bytes = io.BytesIO(img_response.content)
+                print("✅ Изображение успешно сгенерировано через Grok API")
+                return img_bytes
+            else:
+                print(f"❌ Ошибка загрузки изображения: {img_response.status_code}")
+                return None
+        else:
+            print(f"❌ Ошибка генерации изображения: {response.status_code} - {response.text}")
+            return generate_fallback_image(trend)
+            
+    except Exception as e:
+        print(f"❌ Ошибка при генерации изображения: {e}")
+        return generate_fallback_image(trend)
 
-def generate_image(trend):
-    """Генерация картинки для поста"""
+def generate_fallback_image(trend):
+    """Резервная генерация изображения"""
+    print("🖼️ Создаем резервное изображение...")
+    
     try:
         width, height = 1000, 500
         image = Image.new('RGB', (width, height), color=(25, 35, 45))
@@ -156,24 +166,16 @@ def generate_image(trend):
             b = int(45 + (i / height) * 20)
             draw.line([(0, i), (width, i)], fill=(r, g, b))
         
-        try:
-            # Используем стандартный шрифт
-            font = ImageFont.load_default()
-            # Пробуем увеличить размер шрифта
-            title_font = ImageFont.load_default()
-            text_font = ImageFont.load_default()
-        except:
-            font = ImageFont.load_default()
-            title_font = font
-            text_font = font
+        # Используем стандартный шрифт
+        font = ImageFont.load_default()
         
         # Заголовок
         title = "АКТУАЛЬНЫЙ ТРЕНД"
-        draw.text((width//2, 100), title, font=title_font, fill=(255, 215, 0), anchor="mm")
+        draw.text((width//2, 100), title, font=font, fill=(255, 215, 0), anchor="mm")
         
         # Основной текст
         wrapped_text = textwrap.fill(trend, width=25)
-        draw.text((width//2, 250), wrapped_text, font=text_font, fill=(255, 255, 255), anchor="mm")
+        draw.text((width//2, 250), wrapped_text, font=font, fill=(255, 255, 255), anchor="mm")
         
         # Декоративные элементы
         draw.rectangle([50, 50, width-50, height-50], outline=(255, 215, 0), width=3)
@@ -185,7 +187,7 @@ def generate_image(trend):
         return img_byte_arr
         
     except Exception as e:
-        print(f"❌ Ошибка генерации изображения: {e}")
+        print(f"❌ Ошибка генерации резервного изображения: {e}")
         return None
 
 def post_to_telegram(text, image_bytes=None):
@@ -222,10 +224,47 @@ def post_to_telegram(text, image_bytes=None):
         print(f"❌ Ошибка отправки в Telegram: {e}")
         return False
 
+def verify_telegram_credentials():
+    """Проверка корректности Telegram credentials"""
+    print("🔍 Проверка Telegram credentials...")
+    
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getMe"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            bot_info = response.json()
+            print(f"✅ Бот: {bot_info['result']['first_name']} (@{bot_info['result']['username']})")
+            
+            # Проверка доступа к каналу
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChat"
+            data = {"chat_id": TELEGRAM_CHANNEL_ID}
+            response = requests.post(url, data=data, timeout=10)
+            
+            if response.status_code == 200:
+                chat_info = response.json()
+                print(f"✅ Канал: {chat_info['result']['title']}")
+                return True
+            else:
+                print(f"❌ Ошибка доступа к каналу: {response.text}")
+                return False
+        else:
+            print(f"❌ Неверный Telegram token: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Ошибка проверки Telegram: {e}")
+        return False
+
 def main():
     """Основная функция"""
     print("🤖 Запуск генерации поста...")
     print(f"⏰ Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # Проверяем Telegram credentials
+    if not verify_telegram_credentials():
+        print("❌ Проблема с Telegram credentials")
+        return 1
     
     # Получаем тренды из Google Trends
     trends = get_google_trends()
@@ -239,13 +278,8 @@ def main():
     selected_trend = random.choice(trends)
     print(f"🎯 Выбран тренд: {selected_trend}")
     
-    # Генерируем текст через Gemini
-    text = generate_text_with_gemini(selected_trend)
-    
-    # Если не удалось, используем резервную генерацию
-    if not text:
-        print("🔄 Используем резервную генерацию текста...")
-        text = generate_text_fallback(selected_trend)
+    # Генерируем текст через Grok
+    text = generate_text_with_grok(selected_trend)
     
     if not text:
         print("❌ Не удалось сгенерировать текст")
@@ -254,8 +288,8 @@ def main():
     print(f"📝 Текст поста:\n{text}")
     print(f"📏 Длина текста: {len(text)} символов")
     
-    # Генерируем картинку
-    image_bytes = generate_image(selected_trend)
+    # Генерируем картинку через Grok
+    image_bytes = generate_image_with_grok(selected_trend)
     
     # Отправляем пост
     success = post_to_telegram(text, image_bytes)
