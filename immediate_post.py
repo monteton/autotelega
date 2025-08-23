@@ -3,7 +3,7 @@ import requests
 from pytrends.request import TrendReq
 import google.generativeai as genai
 
-# Токены (оставлены открытыми по вашей просьбе)
+# Токены (тестовые)
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
 TELEGRAM_CHANNEL_ID = "-1002201089739"
 GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"
@@ -29,11 +29,9 @@ def get_google_trends():
 
 def generate_post_text_gemini(prompt, api_key):
     print("Генерация текста через Google Gemini API...")
-    genai.api_key = api_key
-    response = genai.generate_text(
-        model="gemini-2.5-flash",
-        prompt=prompt
-    )
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-pro')
+    response = model.generate_content(prompt)
     return response.text
 
 def post_to_telegram(text):
@@ -44,19 +42,39 @@ def post_to_telegram(text):
         "text": text,
         "parse_mode": "HTML"
     }
-    response = requests.post(url, data=data)
-    response.raise_for_status()
-    print("Пост успешно отправлен!")
+    try:
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        print("Пост успешно отправлен!")
+        return True
+    except Exception as e:
+        print(f"Ошибка отправки в Telegram: {e}")
+        return False
 
 if __name__ == "__main__":
     print("Начинаю работу...")
+    
+    # Получаем тренды
     trends = get_google_trends()
+    print(f"Найдены тренды: {trends}")
+    
+    # Выбираем случайный тренд
     selected_trend = random.choice(trends)
-    prompt = f"Напиши короткий остроумный пост для Telegram-канала на тему '{selected_trend}'."
+    print(f"Выбран тренд: {selected_trend}")
+    
+    # Генерируем пост
+    prompt = f"Напиши короткий остроумный пост для Telegram-канала на тему '{selected_trend}'. Пост должен быть интересным и engaging."
     try:
         text = generate_post_text_gemini(prompt, GOOGLE_API_KEY)
+        print(f"Сгенерированный текст: {text}")
     except Exception as e:
-        text = f"Ошибка при генерации текста: {e}"
-        print(text)
-    post_to_telegram(text)
-    print("Готово.")
+        text = f"🚀 {selected_trend}\n\nК сожалению, не удалось сгенерировать креативный текст, но тема очень перспективная! Что думаете об этом?"
+        print(f"Ошибка при генерации текста: {e}")
+    
+    # Отправляем в Telegram
+    success = post_to_telegram(text)
+    
+    if success:
+        print("Готово! Пост успешно опубликован.")
+    else:
+        print("Завершено с ошибками.")
