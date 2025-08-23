@@ -6,20 +6,24 @@ import io
 import textwrap
 import os
 from datetime import datetime
-import json
 from google import genai
 from google.genai import types
 
-# Конфигурация
-TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
-TELEGRAM_CHANNEL_ID = "-1002201089739"
-GEMINI_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"
+# Конфигурация из переменных окружения
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI")
+TELEGRAM_CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID', "-1002201089739")
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU")
 
 NISHA = ["маркетинг", "реклама", "новости", "социальные сети", "digital", "SMM"]
 GEO_LOCATION = 'RU'
 
 # Инициализируем клиент Gemini
-client = genai.Client(api_key=GEMINI_API_KEY)
+try:
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    print("✅ Gemini client initialized")
+except Exception as e:
+    print(f"❌ Gemini client error: {e}")
+    client = None
 
 def get_google_trends():
     """Получение актуальных трендов из Google Trends"""
@@ -68,39 +72,27 @@ def generate_text_with_gemini(trend):
 - Стиль: профессиональный, но доступный и engaging
 - Добавь эмодзи и призыв к обсуждению
 - Сделай 2-3 абзаца для лучшей читаемости
-- В конце добавь 3-4 релевантных хештега
-
-Пример хорошего поста:
-🚀 Тренды Digital-маркетинга 2024
-
-По данным исследований, видео-контент показывает рост вовлеченности на 85% по сравнению с прошлым годом. Short-form video доминирует в соцсетях!
-
-Ключевые изменения:
-• AI-генерация контента +200% эффективности
-• Персонализация на основе данных +45% конверсии
-• Voice search оптимизация +30% трафика
-
-Какие тренды уже используете в своих кампаниях? 💬
-
-#маркетинг #тренды2024 #digital"""
+- В конце добавь 3-4 релевантных хештега"""
 
     try:
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.7,
-                top_p=0.8,
-                max_output_tokens=500
+        if client:
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.7,
+                    top_p=0.8,
+                    max_output_tokens=500
+                )
             )
-        )
-        
-        generated_text = response.text.strip()
-        print("✅ Текст успешно сгенерирован через Gemini")
-        return generated_text
+            generated_text = response.text.strip()
+            print("✅ Текст успешно сгенерирован через Gemini SDK")
+            return generated_text
+        else:
+            return generate_text_direct_api(trend)
         
     except Exception as e:
-        print(f"❌ Ошибка Gemini API: {e}")
+        print(f"❌ Ошибка Gemini SDK: {e}")
         return generate_text_direct_api(trend)
 
 def generate_text_direct_api(trend):
@@ -114,17 +106,7 @@ def generate_text_direct_api(trend):
             {
                 "parts": [
                     {
-                        "text": f"""Создай профессиональный пост для Telegram-канала о маркетинге на тему: "{trend}".
-
-Пост должен содержать:
-- Конкретные цифры и статистику
-- Полезные инсайты для маркетологов
-- Призыв к обсуждению
-- 3-4 релевантных хештега
-- Длина: 250-400 символов
-- Стиль: профессиональный с элементами легкости
-
-Основа пост на реальных трендах 2024 года."""
+                        "text": prompt
                     }
                 ]
             }
@@ -150,7 +132,7 @@ def generate_text_direct_api(trend):
             print("✅ Текст успешно сгенерирован через прямой API")
             return text.strip()
         else:
-            print(f"❌ Ошибка прямого API: {response.status_code}")
+            print(f"❌ Ошибка прямого API: {response.status_code} - {response.text}")
             return None
             
     except Exception as e:
@@ -172,11 +154,15 @@ def generate_image(trend):
             draw.line([(0, i), (width, i)], fill=(r, g, b))
         
         try:
-            title_font = ImageFont.truetype("arialbd.ttf", 46)
-            text_font = ImageFont.truetype("arial.ttf", 32)
+            # Попробуем использовать доступные шрифты
+            font = ImageFont.load_default()
+            # Или создадим простой шрифт
+            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 42) if os.path.exists("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf") else font
+            text_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 28) if os.path.exists("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf") else font
         except:
-            title_font = ImageFont.load_default()
-            text_font = ImageFont.load_default()
+            font = ImageFont.load_default()
+            title_font = font
+            text_font = font
         
         # Заголовок
         title = "АКТУАЛЬНЫЙ ТРЕНД"
@@ -186,8 +172,6 @@ def generate_image(trend):
         
         # Основной текст
         wrapped_text = textwrap.fill(trend, width=25)
-        bbox = draw.textbbox((0, 0), wrapped_text, font=text_font)
-        text_height = bbox[3] - bbox[1]
         draw.text((width // 2, 280), wrapped_text, font=text_font, fill=(255, 255, 255), anchor="mm")
         
         # Декоративные элементы
@@ -226,9 +210,12 @@ def post_to_telegram(text, image_bytes=None):
             }
             response = requests.post(url, data=data)
         
-        response.raise_for_status()
-        print("✅ Пост успешно отправлен!")
-        return True
+        if response.status_code == 200:
+            print("✅ Пост успешно отправлен!")
+            return True
+        else:
+            print(f"❌ Ошибка отправки: {response.status_code} - {response.text}")
+            return False
         
     except Exception as e:
         print(f"❌ Ошибка отправки в Telegram: {e}")
@@ -254,11 +241,6 @@ def main():
     # Генерируем текст через Gemini
     text = generate_text_with_gemini(selected_trend)
     
-    # Если не удалось через SDK, пробуем прямой API
-    if not text:
-        print("🔄 Попытка через прямой API...")
-        text = generate_text_direct_api(selected_trend)
-    
     if not text:
         print("❌ Не удалось сгенерировать текст")
         return 1
@@ -280,8 +262,5 @@ def main():
         return 1
 
 if __name__ == "__main__":
-    # Установите зависимости:
-    # pip install pytrends requests Pillow google-genai
-    
     exit_code = main()
     exit(exit_code)
