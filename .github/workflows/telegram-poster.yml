@@ -25,22 +25,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Create .env file from secrets
+    - name: Set environment variables from secrets
       run: |
-        cat > .env << EOF
-        TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}
-        TELEGRAM_CHANNEL_ID=${{ secrets.TELEGRAM_CHANNEL_ID }}
-        GROK_API_KEY=${{ secrets.GROK_API_KEY }}
-        EOF
-        
-        # Для проверки (не показываем значения в логах)
-        echo "✅ .env file created successfully"
-        echo "TELEGRAM_TOKEN=***"
-        echo "TELEGRAM_CHANNEL_ID=***" 
-        echo "GROK_API_KEY=***"
+        echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" >> $GITHUB_ENV
+        echo "TELEGRAM_CHANNEL_ID=${{ secrets.TELEGRAM_CHANNEL_ID }}" >> $GITHUB_ENV
+        echo "GROK_API_KEY=${{ secrets.GROK_API_KEY }}" >> $GITHUB_ENV
+        echo "✅ Environment variables set from GitHub Secrets"
 
     - name: Run Telegram Poster
-      run: python src/main.py
+      run: python -m src.main
 
     - name: Notify on failure
       if: failure()
