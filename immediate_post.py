@@ -1,9 +1,9 @@
 import random
 import requests
 from pytrends.request import TrendReq
-from google import genai
+import google.generativeai as genai
 
-# Ваши ключи (оставлены открытыми по просьбе)
+# Токены (оставлены открытыми по вашей просьбе)
 TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
 TELEGRAM_CHANNEL_ID = "-1002201089739"
 GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU"
@@ -29,12 +29,11 @@ def get_google_trends():
 
 def generate_post_text_gemini(prompt, api_key):
     print("Генерация текста через Google Gemini API...")
-    client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
+    genai.api_key = api_key
+    response = genai.generate_text(
         model="gemini-2.5-flash",
-        contents=[prompt]
+        prompt=prompt
     )
-    # Обычно response.text содержит ответ сгенерированного текста
     return response.text
 
 def post_to_telegram(text):
@@ -54,12 +53,10 @@ if __name__ == "__main__":
     trends = get_google_trends()
     selected_trend = random.choice(trends)
     prompt = f"Напиши короткий остроумный пост для Telegram-канала на тему '{selected_trend}'."
-    
     try:
         text = generate_post_text_gemini(prompt, GOOGLE_API_KEY)
     except Exception as e:
         text = f"Ошибка при генерации текста: {e}"
         print(text)
-
     post_to_telegram(text)
     print("Готово.")
