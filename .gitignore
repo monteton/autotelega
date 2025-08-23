@@ -1,12 +1,25 @@
-# Не добавлять парольные и секретные файлы
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtualenv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# VS Code settings
+.vscode/
+
+# Настройки/секреты
 .env
+*.env
 secrets.json
 
-# Не трекать временные файлы
+# Logs
 *.log
-*.pyc
-__pycache__/
-
-# Исключить папки с библиотеками
-venv/
-node_modules/
