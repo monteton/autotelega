@@ -1,25 +1,24 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Virtualenv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# VS Code settings
-.vscode/
-
-# Настройки/секреты
+# Secrets
 .env
 *.env
-secrets.json
+secrets/
+config/secrets.py
 
-# Logs
-*.log
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
