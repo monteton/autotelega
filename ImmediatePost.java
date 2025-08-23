@@ -11,7 +11,7 @@ public class ImmediatePost {
     private static final String GOOGLE_API_KEY = "AIzaSyCuWBy5qkUMO5oTAcIivzYSC0R9xiZjoUU";
 
     public static void main(String[] args) throws Exception {
-        // Пример списка трендов (замена google trends API на статический список для простоты)
+        // Пример списка трендов (для простоты)
         String[] trends = {"тренды в маркетинге 2025", "новые функции Telegram", "AI в рекламе"};
         Random random = new Random();
         String selectedTrend = trends[random.nextInt(trends.length)];
@@ -30,11 +30,17 @@ public class ImmediatePost {
     private static String generateTextGemini(String prompt) throws Exception {
         HttpClient client = HttpClient.newHttpClient();
 
-        String apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateText?key=" + GOOGLE_API_KEY;
+        String apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GOOGLE_API_KEY;
 
+        // Тело запроса под формат Gemini 2.0 Flash API
         String jsonPayload = "{"
-                + "\"prompt\": {\"text\": \"" + prompt + "\"},"
-                + "\"maxOutputTokens\": 256"
+                + "\"content\": ["
+                + "{"
+                + "\"parts\": ["
+                + "{\"text\": \"" + prompt.replace("\"", "\\\"") + "\"}"
+                + "]"
+                + "}"
+                + "]"
                 + "}";
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -46,15 +52,22 @@ public class ImmediatePost {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() == 200) {
-            // Для простоты парсим ответ вручную (лучше использовать JSON библиотеку, например, Jackson/Gson)
             String body = response.body();
-            int start = body.indexOf("\"text\":\"") + 8;
-            int end = body.indexOf("\"", start);
-            if (start > 7 && end > start) {
-                String text = body.substring(start, end);
-                return text.replace("\\n", "\n").replace("\\\"", "\"");
+            // Пример простого парсинга для извлечения текста из field candidates[0].content.parts.text
+            // Для продакшна используйте JSON библиотеку (Gson/Jackson)
+            String marker = "\"text\":\"";
+            int start = body.indexOf(marker);
+            if (start == -1) {
+                return "Не удалось найти сгенерированный текст в ответе";
             }
-            return "Ошибка парсинга ответа.";
+            start += marker.length();
+            int end = body.indexOf("\"", start);
+            if (end == -1) {
+                return "Не удалось найти конец текста в ответе";
+            }
+            String text = body.substring(start, end);
+            // Привести escape-последовательности к нормальному виду
+            return text.replace("\\n", "\n").replace("\\\"", "\"");
         } else {
             throw new RuntimeException("Ошибка запроса Gemini API: " + response.statusCode() + " " + response.body());
         }
