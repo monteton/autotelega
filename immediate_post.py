@@ -1,20 +1,20 @@
 import os
 import random
 import requests
+import urllib.parse
 from pytrends.request import TrendReq
 
-# --- 1. Настройки (безопасное получение из секретов) ---
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") # Новый ключ
-
-NISHA = ["маркетинг", "реклама", "новости", "социальные сети"]
+# --- Настройки (без API ключей) ---
+TELEGRAM_TOKEN = "8461091151:AAEd-mqGswAijmwFB0teeXeZFe-gtHfD-PI"
+TELEGRAM_CHANNEL_ID = "-1002201089739"
+NISHA = ["маркетинг", "реклама", "социальные сети"]
 GEO_LOCATION = 'RS'
 FALLBACK_TRENDS = ["тренды в маркетинге 2025", "новые функции Telegram", "AI в рекламе"]
 
-# --- 2. Функции ---
+# --- Функции ---
 
 def get_google_trends():
+    """Получает список актуальных поисковых запросов из Google Trends."""
     print("Запрос к Google Trends...")
     try:
         pytrends = TrendReq(hl='ru-RU', tz=120)
@@ -26,64 +26,53 @@ def get_google_trends():
         print(f"Ошибка Google Trends: {e}. Использую запасные темы.")
         return FALLBACK_TRENDS
 
-def generate_content_with_openai(trend):
+def generate_post_text(trend):
     """
-    Генерирует текст и промпт для картинки с помощью OpenAI API.
+    Генерирует текст поста с помощью надежного народного API.
     """
-    print(f"Генерация контента через OpenAI для тренда: '{trend}'...")
+    print(f"Генерация текста для тренда: '{trend}'...")
+    prompt = (f"Напиши короткий, остроумный пост для Telegram-канала о цифровом маркетинге. "
+              f"Тема: '{trend}'. "
+              f"Стиль: профессиональный, но легкий и с юмором. "
+              f"Объем 200-1500 символов.")
     
-    # Промпт для создания текста и идеи для картинки одним запросом
-    prompt = (f"Ты — AI-ассистент для Telegram-канала о маркетинге. "
-              f"1. Напиши короткий, легкий и остроумный пост на тему: '{trend}'. "
-              f"2. После текста, с новой строки, напиши краткий, яркий промпт на английском языке для генератора изображений (DALL-E), который иллюстрирует пост. "
-              f"Формат: IMAGE_PROMPT: [your prompt here]")
-    
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "model": "gpt-4o-mini", # Самая быстрая и дешевая модель
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 500
-    }
+    url = "https://api.logan.oveo.workers.dev/"
+    params = {"message": prompt}
     
     try:
-        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=data)
+        response = requests.get(url, params=params, timeout=90)
         response.raise_for_status()
-        content = response.json()['choices'][0]['message']['content']
-        
-        # Разделяем текст и промпт для картинки
-        parts = content.split("IMAGE_PROMPT:")
-        post_text = parts[0].strip()
-        image_prompt = parts[1].strip() if len(parts) > 1 else f"digital art for the topic: {trend}"
-        
-        return post_text, image_prompt
+        # Этот API возвращает текст в поле 'response'
+        text = response.json().get("response", "API не вернул текст.")
+        print("Текст успешно сгенерирован.")
+        return text
     except Exception as e:
-        print(f"Ошибка OpenAI (текст): {e}")
-        return f"Не удалось сгенерировать текст для '{trend}'.", "abstract marketing concept, digital art"
+        error_message = f"Ошибка при генерации текста: {e}"
+        print(f"!!! {error_message}")
+        return error_message
 
-def generate_image_with_openai(prompt):
+def generate_image_data(post_text):
     """
-    Генерирует изображение с помощью DALL-E 3.
+    Генерирует изображение на основе текста, используя бесплатный API от Pollinations.ai.
     """
-    print(f"Генерация изображения с промптом: '{prompt}'...")
-    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
-    data = {
-        "model": "dall-e-3",
-        "prompt": prompt,
-        "n": 1,
-        "size": "1024x1024",
-        "quality": "standard" # Дешевле, чем hd
-    }
+    print("Генерация изображения из контекста поста...")
+    # Создаем короткий, но емкий промпт для картинки
+    image_prompt = " ".join(post_text.split()[:25]) + ", cinematic, hyper-detailed, marketing, digital art"
+    encoded_prompt = urllib.parse.quote(image_prompt)
+    
+    # URL API, который генерирует изображение по текстовому описанию
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+    
+    print(f"Запрос к Pollinations.ai с промптом: {image_prompt[:50]}...")
     
     try:
-        response = requests.post("https://api.openai.com/v1/images/generations", headers=headers, json=data)
+        response = requests.get(url, timeout=120)
         response.raise_for_status()
-        image_url = response.json()['data']['url']
-        return requests.get(image_url).content
+        print("Изображение успешно сгенерировано.")
+        return response.content
     except Exception as e:
-        print(f"Ошибка OpenAI (изображение): {e}. Использую заглушку.")
+        print(f"Ошибка генерации изображения: {e}. Использую встроенную заглушку.")
+        # Надежная встроенная заглушка, которая не требует сети
         return b'GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02L\x01\x00;'
 
 def post_to_telegram(text, image_data):
@@ -95,21 +84,17 @@ def post_to_telegram(text, image_data):
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
         response = requests.post(url, data=data, files=files)
         response.raise_for_status()
-        print("Пост успешно отправлен!")
+        print(f"Пост успешно отправлен! Ответ API: {response.json()}")
     except Exception as e:
         print(f"!!! Ошибка отправки в Telegram: {e}")
 
 # --- Точка входа ---
 if __name__ == "__main__":
-    if not OPENAI_API_KEY:
-        print("Критическая ошибка: не найден OPENAI_API_KEY в секретах.")
-    else:
-        print("--- ЗАПУСК СТАБИЛЬНОЙ ВЕРСИИ С OPENAI ---")
-        trends = get_google_trends()
-        selected_trend = random.choice(trends)
-        
-        post_text, image_prompt = generate_content_with_openai(selected_trend)
-        image_data = generate_image_with_openai(image_prompt)
-        
-        post_to_telegram(post_text, image_data)
-        print("--- РАБОТА СКРИПТА ЗАВЕРШЕНА ---")
+    print("--- ЗАПУСК С НАРОДНЫМИ API (ТЕКСТ + КАРТИНКА) ---")
+    trends = get_google_trends()
+    selected_trend = random.choice(trends)
+    post_text = generate_post_text(selected_trend)
+    image_data = generate_image_data(post_text)
+    post_to_telegram(post_text, image_data)
+    print("--- РАБОТА СКРИПТА ЗАВЕРШЕНА ---")
+
