@@ -1,4 +1,3 @@
-import os
 import random
 import requests
 from pytrends.request import TrendReq
@@ -34,19 +33,24 @@ def get_google_trends():
 
 def generate_post_text(trend):
     print(f"Генерация текста для тренда: '{trend}'...")
-    prompt = (
-        f"Ты — остроумный и легкий в общении SMM-менеджер для Telegram-канала о маркетинге.\n"
-        f"Напиши короткий пост по теме '{trend}' в неформальном, юмористическом стиле, объемом от 200 до 1500 символов."
-    )
+    prompt = f"Напиши короткий остроумный пост для Telegram-канала о маркетинге на тему '{trend}'."
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GOOGLE_API_KEY}"
     headers = {"Content-Type": "application/json"}
     data = {
-        "contents": [{"parts": [{"text": prompt}]}]
+      "prompt": {
+        "text": prompt
+      },
+      "temperature": 0.7,
+      "maxOutputTokens": 500,
+      "candidateCount": 1,
+      "topP": 0.8,
+      "topK": 40,
+      "stopSequences": ["\n"]
     }
     try:
-        response = requests.post(url, json=data, headers=headers)
+        response = requests.post(url, headers=headers, json=data)
         response.raise_for_status()
-        text = response.json()["candidates"][0]["content"]["parts"]["text"]
+        text = response.json()["candidates"][0]["content"]["text"]
         print("Текст успешно сгенерирован.")
         return text
     except Exception as e:
@@ -60,7 +64,7 @@ def post_to_telegram(text):
         data = {
             "chat_id": TELEGRAM_CHANNEL_ID,
             "text": text,
-            "parse_mode": "HTML"  # Позволяет использовать HTML-разметку (жирный шрифт, ссылки и т.п.)
+            "parse_mode": "HTML"
         }
         response = requests.post(url, data=data)
         response.raise_for_status()
